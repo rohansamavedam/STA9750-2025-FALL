@@ -1,0 +1,373 @@
+---
+title: "Mini-Project #01"
+subtitle: "Gourmet Cheeseburgers Across the Globe: Exploring the Most Popular Programming on Netflix"
+format: html
+---
+# Press Releases
+## Netflix Announces Final Season of Stranger Things After Histroic Global Run
+
+![Stranger Things Promo](https://dnm.nflximg.net/api/v6/BvVbc2Wxr2w6QuoANoSpJKEIWjQ/AAAAQUq_sj3y88nqrcBnRm69rS7xur65HYgLkCS5MxHbA-7Dvd72b3Mek4eoiDb5Rb4-dzpaJz260toRGHQIeKdtAvUxWmmk5hio-pquv_pTESDyz5XQuv6K0vlqFQvsPXGuMA0OfA7q27_8cBy9ds-8RroPX1Y.jpg?r=9d3)
+
+Netflix is proud to announce that the fifth and final season of *Stranger Things* will premiere at the end of 2025, marking the conclusion of one of the most iconic series in streaming history. Across its first four seasons, *Stranger Things* has amassed **nearly 3 billion hours viewed globally**, holding a place in the Top 10 for **19 weeks**. Its reach extended far beyond the United States, charting in **93 countries** and captivating audiences worldwide. These achievements place *Stranger Things* among Netflix’s most successful English-language shows, underscoring its unmatched cultural impact and global popularity. As fans prepare for Season 5, the series continues to stand as a symbol of Netflix’s ability to create entertainment that resonates across borders.
+
+## India Emerges as a Global Force in Netflix Streaming with Hits Like Pushpa 2 and Animal
+
+![Netflix India Promo](https://inc42.com/cdn-cgi/image/quality=75/https://asset.inc42.com/2024/08/netflix-india-social.png)
+
+Netflix continues to see tremendous growth in India, powered by the success of its Hindi-language and regional blockbusters. Recent releases like *Pushpa 2: The Rule (Reloaded Version)* and *Animal* have captured global attention, underscoring India’s rising influence in Netflix’s worldwide catalog.  
+
+*Pushpa 2* debuted in India on **February 2, 2025**, staying in the Top 10 for **10 weeks**, peaking at **#1**, and amassing over **35.4 million global viewing hours** across **15 countries**.  
+
+*Animal* premiered earlier on **January 28, 2024**, achieving **17 weeks in India’s Top 10**, also peaking at **#1**, with more than **45.6 million global viewing hours** and success across **19 countries**.  
+
+These back-to-back global hits highlight India’s ability to produce content that resonates far beyond domestic borders, positioning the region as a cornerstone for Netflix’s international growth strategy.  
+
+As Netflix continues to invest in regional stories, India’s entertainment industry proves to be a vital driver of global subscriber engagement and long-term growth.  
+
+## Emily in Paris Season 5 – A Global Fan Favorite Returns
+
+![Emily in Paris Promo](https://betches.s3.amazonaws.com/app/uploads/2024/09/19142855/emily-in-paris-season-5.jpg)
+
+Netflix is delighted to announce the upcoming release of *Emily in Paris* Season 5, continuing the journey of fashion, love, and adventure that has captivated audiences worldwide.  
+
+Across its first four seasons, *Emily in Paris* has achieved **over 1.02 billion global viewing hours**, reflecting its extraordinary popularity. The series has enjoyed a **Top 10 presence for 8 weeks**, showcasing its ability to sustain momentum and remain a viewer favorite. Most impressively, the show has reached audiences in **94 countries**, solidifying its place as one of Netflix’s most internationally beloved comedies.  
+
+With Season 5 on the horizon, *Emily in Paris* promises to deliver more charm, style, and storytelling that resonates with fans across the globe, further cementing its legacy as a Netflix global hit.  
+
+# Appendix
+## Task 1: Data Acquisition
+
+```{r}
+
+if(!dir.exists(file.path("data", "mp01"))){
+  dir.create(file.path("data", "mp01"), showWarnings=FALSE, recursive=TRUE)
+}
+
+GLOBAL_TOP_10_FILENAME <- file.path("data", "mp01", "global_top10_alltime.csv")
+
+if(!file.exists(GLOBAL_TOP_10_FILENAME)){
+  download.file("https://www.netflix.com/tudum/top10/data/all-weeks-global.tsv",
+                destfile=GLOBAL_TOP_10_FILENAME)
+}
+
+COUNTRY_TOP_10_FILENAME <- file.path("data", "mp01", "country_top10_alltime.csv")
+
+if(!file.exists(COUNTRY_TOP_10_FILENAME)){
+  download.file("https://www.netflix.com/tudum/top10/data/all-weeks-countries.tsv",
+                destfile=COUNTRY_TOP_10_FILENAME)
+}
+
+```
+
+## Task 2 & 3: Data Cleaning & Data Import
+
+```{r}
+
+if(!require("tidyverse")) install.packages("tidyverse")
+library(readr)
+library(dplyr)
+
+GLOBAL_TOP_10 <- read_tsv(GLOBAL_TOP_10_FILENAME)
+GLOBAL_TOP_10 <- GLOBAL_TOP_10 |>
+    mutate(season_title = if_else(season_title == "N/A", NA_character_, season_title))
+
+COUNTRY_TOP_10 <- read_tsv(COUNTRY_TOP_10_FILENAME, na = "N/A")
+
+# glimpse(GLOBAL_TOP_10)
+# glimpse(COUNTRY_TOP_10)
+
+library(DT)
+library(stringr)
+format_titles <- function(df){
+    colnames(df) <- str_replace_all(colnames(df), "_", " ") |> str_to_title()
+    df
+}
+
+GLOBAL_TOP_10 |> 
+    mutate(`runtime_(minutes)` = round(60 * runtime)) |>
+    select(-season_title, 
+           -runtime) |>
+    format_titles() |>
+    head(n=100) |>
+    datatable(options=list(searching=FALSE, info=FALSE)) |>
+    formatRound(c('Weekly Hours Viewed', 'Weekly Views'))
+
+```
+
+## Task 4: Exploratory Questions
+### Q1: How many different countries does Netflix operate in? (You can use the viewing history as a proxy for countries in which Netflix operates.)
+
+```{r}
+glimpse(COUNTRY_TOP_10)
+COUNTRY_TOP_10 |> 
+    select(-season_title) |>
+    format_titles() |>
+    head(n=100) |>
+    datatable(options=list(searching=FALSE, info=FALSE))
+```
+
+This question translates to the number of unique countries in the COUNTRY_TOP_10 dataset.
+
+```{r}
+num_country <- length(unique(COUNTRY_TOP_10$country_name))
+num_country
+```
+Netflix operates in `r num_country` different countries based on the viewing history data.
+
+### Q2: Which non-English-language film has spent the most cumulative weeks in the global top 10? How many weeks did it spend?
+```{r}
+top_non_eng_film <- GLOBAL_TOP_10 |>
+    filter(category == "Films (Non-English)") |>
+    arrange(desc(cumulative_weeks_in_top_10)) |>
+    slice(1)
+
+glimpse(top_non_eng_film)
+```
+The non-English film with the most cumulative weeks in the global top 10 is "`r top_non_eng_film$show_title`", which spent `r top_non_eng_film$cumulative_weeks_in_top_10` weeks in the top 10.
+
+### Q3: What is the longest film (English or non-English) to have ever appeared in the Netflix global Top 10? How long is it in minutes?
+```{r}
+longest_film_in_netflix_global_top10 <- GLOBAL_TOP_10 |>
+    filter(category %in% c("Films (English)", "Films (Non-English)")) |>
+    arrange(desc(runtime)) |>
+    slice(1)
+
+longest_runtime_minutes <- round(longest_film_in_netflix_global_top10$runtime * 60)
+
+glimpse(longest_film_in_netflix_global_top10)
+```
+
+The longest film (English or non-English) to appear in the Netflix global Top 10 is `r longest_film_in_netflix_global_top10$show_title`, with a runtime of `r longest_runtime_minutes` minutes.
+
+### Q4: For each of the four categories, what program has the most total hours of global viewership?
+```{r}
+top_titles <- GLOBAL_TOP_10 |>
+    group_by(category, show_title) |>
+    summarize(total_hours_viewed = sum(weekly_hours_viewed, na.rm=TRUE), .groups='drop') |>
+    arrange(category, desc(total_hours_viewed)) |>
+    group_by(category) |>
+    slice(1)
+
+glimpse(top_titles)
+```
+
+The top global titles by total hours viewed are:
+
+- Films (English): `r top_titles$show_title[top_titles$category=="Films (English)"]`
+- Films (Non-English): `r top_titles$show_title[top_titles$category=="Films (Non-English)"]`
+- TV (English): `r top_titles$show_title[top_titles$category=="TV (English)"]`
+- TV (Non-English): `r top_titles$show_title[top_titles$category=="TV (Non-English)"]`
+
+### Q5: Which TV show had the longest run in a country’s Top 10? How long was this run and in what country did it occur?
+```{r}
+longest_tv_show_run <- COUNTRY_TOP_10 |>
+    filter(category == "TV") |>
+    group_by(country_name, show_title) |>
+    summarise(longest_run = max(cumulative_weeks_in_top_10, na.rm = TRUE), .groups = "drop") |>
+    slice_max(longest_run, n = 1, with_ties = FALSE)
+
+glimpse(longest_tv_show_run)
+```
+
+The TV show with the longest run in a country’s Top 10 is `r longest_tv_show_run$show_title`, 
+with `r longest_tv_show_run$longest_run` weeks in `r longest_tv_show_run$country_name`.
+
+### Q6: Netflix provides over 200 weeks of service history for all but one country in our data set. Which country is this and when did Netflix cease operations in that country?
+```{r}
+country_weeks <- COUNTRY_TOP_10 |>
+    group_by(country_name) |>
+    summarise(total_weeks = n_distinct(week), .groups = "drop") |>
+    arrange(total_weeks)
+
+ceased_country <- country_weeks |> filter(total_weeks < 200)
+
+last_week_ceased <- COUNTRY_TOP_10 |>
+  filter(country_name %in% ceased_country$country_name) |>
+  summarise(last_week = max(week))
+
+glimpse(ceased_country)
+```
+
+Netflix ceased operations in `r ceased_country$country_name`, 
+after `r ceased_country$total_weeks` weeks of service history. 
+The last reported Top-10 chart for that country was on `r last_week_ceased`.
+
+### Q7: What is the total viewership of the TV show Squid Game? Note that there are three seasons total and we are looking for the total number of hours watched across all seasons.
+```{r}
+squid_game_viewership <- GLOBAL_TOP_10 |>
+  filter(str_detect(show_title, regex("Squid Game", ignore_case = TRUE))) |>
+  summarise(total_hours = sum(weekly_hours_viewed, na.rm = TRUE))
+
+glimpse(squid_game_viewership)
+```
+
+The total global viewership of Squid Game across all seasons is `r squid_game_viewership$total_hours` hours.
+
+### Q8: The movie Red Notice has a runtime of 1 hour and 58 minutes. Approximately how many views did it receive in 2021? Note that Netflix does not provide the weekly_views values that far back in the past, but you can compute it yourself using the total view time and the runtime.
+```{r}
+runtime_hours <- 118/60
+
+num_views <- GLOBAL_TOP_10 |>
+  filter(show_title == "Red Notice", year(week) == 2021) |>
+  summarise(total_views = sum(weekly_hours_viewed / runtime_hours, na.rm = TRUE))
+
+glimpse(num_views)
+```
+
+The movie Red Notice (runtime 118 minutes) received approximately `r round(num_views$total_views)` views in 2021.
+
+### Q9: How many Films reached Number 1 in the US but did not originally debut there? That is, find films that first appeared on the Top 10 chart at, e.g., Number 4 but then became more popular and eventually hit Number 1? What is the most recent film to pull this off?
+```{r}
+us_films <- COUNTRY_TOP_10 |>
+    filter(category %in% c("Films", "Films (English)", "Films (Non-English)"),
+         country_name == "United States")
+
+film_rank_progress <- us_films |>
+    group_by(show_title) |>
+    summarise(
+      debut_week = min(week),
+      debut_rank = weekly_rank[week == debut_week][1],
+      best_rank = min(weekly_rank, na.rm = TRUE),
+      most_recent_week = max(week),
+      .groups = "drop"
+    )
+
+films_that_climbed <- film_rank_progress |>
+    filter(best_rank == 1, debut_rank > 1)
+
+num_films_climbed <- nrow(films_that_climbed)
+
+most_recent_film <- films_that_climbed |>
+    arrange(desc(most_recent_week)) |>
+    slice(1)
+
+glimpse(us_films)
+glimpse(film_rank_progress)
+glimpse(films_that_climbed)
+glimpse(num_films_climbed)
+glimpse(most_recent_film)
+```
+
+A total of `r num_films_climbed` films in the US Top 10 first debuted below 1 but later climbed to the top spot.  
+The most recent film to achieve this was `r most_recent_film$show_title`, 
+which reached 1 in the week ending `r most_recent_film$most_recent_week`.
+
+### Q10: Which TV show/season hit the top 10 in the most countries in its debut week? In how many countries did it chart?
+```{r}
+tv_data <- COUNTRY_TOP_10 |>
+    filter(category %in% c("TV", "TV (English)", "TV (Non-English)"))
+
+debut_weeks <- tv_data |>
+    group_by(show_title, season_title, country_name) |>
+    summarise(debut_week = min(week), .groups = "drop")
+
+debut_counts <- debut_weeks |>
+    group_by(show_title, season_title, debut_week) |>
+    summarise(num_countries = n_distinct(country_name), .groups = "drop") |>
+    arrange(desc(num_countries))
+
+top_debut <- debut_counts |> slice(1)
+
+glimpse(top_debut)
+```
+
+The TV show/season that hit the Top 10 in the most countries in its debut week was 
+`r top_debut$show_title` (`r top_debut$season_title`), 
+appearing in the Top 10 in `r top_debut$num_countries` countries in its debut week 
+(`r top_debut$debut_week`).
+
+### Stranger Things Press Release
+```{r}
+total_hours_stranger_things <-
+    GLOBAL_TOP_10 |>
+    filter(show_title == "Stranger Things") |>
+    summarise(total_hours = sum(weekly_hours_viewed, na.rm = TRUE)) |>
+    pull(total_hours)
+
+longest_run_stranger_things <-
+    GLOBAL_TOP_10 |>
+    filter(show_title == "Stranger Things") |>
+    summarise(total_weeks = max(cumulative_weeks_in_top_10, na.rm = TRUE)) |>
+    pull(total_weeks)
+
+num_countries_stranger_things <-
+    COUNTRY_TOP_10 |>
+    filter(show_title == "Stranger Things") |>
+    summarise(num_countries = n_distinct(country_name)) |>
+    pull(num_countries)
+
+glimpse(total_hours_stranger_things)
+glimpse(longest_run_stranger_things)
+glimpse(num_countries_stranger_things)
+```
+
+### Netflix's Commercial Success in India
+```{r}
+pushpa_india <- COUNTRY_TOP_10 |>
+  filter(country_name == "India",
+         show_title == "Pushpa 2: The Rule (Reloaded Version)") |>
+  summarise(
+    weeks      = n_distinct(week),
+    peak_rank  = min(weekly_rank, na.rm = TRUE),
+    debut_week = min(week, na.rm = TRUE)
+  )
+
+pushpa_global_hours <- GLOBAL_TOP_10 |>
+  filter(show_title == "Pushpa 2: The Rule (Reloaded Version)") |>
+  summarise(hours = sum(weekly_hours_viewed, na.rm = TRUE)) |>
+  pull(hours)
+
+pushpa_global_countries <- COUNTRY_TOP_10 |>
+  filter(show_title == "Pushpa 2: The Rule (Reloaded Version)") |>
+  summarise(countries = n_distinct(country_name)) |>
+  pull(countries)
+
+animal_india <- COUNTRY_TOP_10 |>
+  filter(country_name == "India",
+         show_title == "Animal") |>
+  summarise(
+    weeks      = n_distinct(week),
+    peak_rank  = min(weekly_rank, na.rm = TRUE),
+    debut_week = min(week, na.rm = TRUE)
+  )
+
+animal_global_hours <- GLOBAL_TOP_10 |>
+  filter(show_title == "Animal") |>
+  summarise(hours = sum(weekly_hours_viewed, na.rm = TRUE)) |>
+  pull(hours)
+
+animal_global_countries <- COUNTRY_TOP_10 |>
+  filter(show_title == "Animal") |>
+  summarise(countries = n_distinct(country_name)) |>
+  pull(countries)
+
+glimpse(pushpa_india)
+glimpse(pushpa_global_hours)
+glimpse(pushpa_global_countries)
+glimpse(animal_india)
+glimpse(animal_global_hours)
+glimpse(animal_global_countries)
+```
+
+### Open Topic (Emily in Paris Season 5 Launch)
+```{r}
+emily_hours <- GLOBAL_TOP_10 |>
+    filter(show_title == "Emily in Paris") |>
+    summarise(total_hours = sum(weekly_hours_viewed, na.rm = TRUE)) |>
+    pull(total_hours)
+
+emily_longest_run <- GLOBAL_TOP_10 |>
+    filter(show_title == "Emily in Paris") |>
+    summarise(longest_run = max(cumulative_weeks_in_top_10, na.rm = TRUE)) |>
+    pull(longest_run)
+
+emily_countries <- COUNTRY_TOP_10 |>
+    filter(show_title == "Emily in Paris") |>
+    summarise(num_countries = n_distinct(country_name)) |>
+    pull(num_countries)
+
+glimpse(emily_hours)
+glimpse(emily_longest_run)
+glimpse(emily_countries)
+```
+
