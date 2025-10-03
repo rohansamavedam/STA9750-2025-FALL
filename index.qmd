@@ -1,24 +1,19 @@
 ---
-title: "Krishna Rohan Samavedam - MS BA Student @ CUNY Baruch College"
+title: "Krishna Rohan Samavedam - Gradute Student @ CUNY Baruch College"
+subtitle: "MS in Business Analytics, Concentration in Marketing Analytics"
 ---
 
-&nbsp;  
+<div style="text-align: center">
+<a href="https://www.linkedin.com/in/rohansamavedam/">LinkedIn</a> • 
+<a href="https://github.com/rohansamavedam">GitHub</a> • 
+<a href="https://rohansamavedam.dev/">Website</a>
+</div>
 
-![](https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExeHpmNm5wcXc4eDFkbGh0ZDd5bnFjdDJpdzNrNnRhMDVqdGk5cDIzZyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/oLxTxxHz6DfGkgFaWk/giphy.gif){fig-align="center"}
-
-<p align="center">
-  <a href="https://www.linkedin.com/in/rohansamavedam/">LinkedIn</a> • 
-  <a href="https://github.com/rohansamavedam">GitHub</a> • 
-  <a href="https://rohansamavedam.dev/">Website</a>
-</p>
-
-&nbsp;  
-&nbsp;  
-&nbsp;  
 
 ```{r}
 #| include: false
-1+1
 ```
---------------
+
+------------------------------------------------------------------------
+
 Last Updated: `r format(Sys.time(), "%A %m %d, %Y at %H:%M%p")`
