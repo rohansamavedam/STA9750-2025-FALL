@@ -1,6 +1,6 @@
 ---
 title: "Krishna Rohan Samavedam - Gradute Student @ CUNY Baruch College"
-subtitle: "MS in Business Analytics, Concentration in Marketing Analytics"
+subtitle: "Submission Material for STA 9750 (Software Tools for Data Analysis)"
 ---
 
 <div style="text-align: center">
@@ -8,6 +8,11 @@ subtitle: "MS in Business Analytics, Concentration in Marketing Analytics"
 <a href="https://github.com/rohansamavedam">GitHub</a> • 
 <a href="https://rohansamavedam.dev/">Website</a>
 </div>
+
+
+### 🧩 Mini Projects
+
+- [Mini Project 01: Netflix Gourmet Cheeseburgers (Press Releases)](https://rohansamavedam.github.io/STA9750-2025-FALL/mp01.html)
 
 
 ```{r}
