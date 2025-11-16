@@ -1,18 +1,12 @@
 ---
-title: "Krishna Rohan Samavedam - Gradute Student @ CUNY Baruch College"
+title: "Krishna Rohan Samavedam - Graduate Student @ CUNY Baruch College"
 subtitle: "Submission Material for STA 9750 (Software Tools for Data Analysis)"
 ---
 
-<div style="text-align: center">
-<a href="https://www.linkedin.com/in/rohansamavedam/">LinkedIn</a> • 
-<a href="https://github.com/rohansamavedam">GitHub</a> • 
-<a href="https://rohansamavedam.dev/">Website</a>
-</div>
-
-
-### 🧩 Mini Projects
+### Mini Projects
 
 - [Mini Project 01: Netflix Gourmet Cheeseburgers (Press Releases)](https://rohansamavedam.github.io/STA9750-2025-FALL/mp01.html)
+- [Mini Project 02: Making Backyards Affordable for All](https://rohansamavedam.github.io/STA9750-2025-FALL/mp02.html)
 
 
 ```{r}
@@ -22,3 +16,9 @@ subtitle: "Submission Material for STA 9750 (Software Tools for Data Analysis)"
 ------------------------------------------------------------------------
 
 Last Updated: `r format(Sys.time(), "%A %m %d, %Y at %H:%M%p")`
+
+<div style="text-align: left">
+<a href="https://www.linkedin.com/in/rohansamavedam/">LinkedIn</a> • 
+<a href="https://github.com/rohansamavedam">GitHub</a> • 
+<a href="https://rohansamavedam.dev/">Website</a>
+</div>
