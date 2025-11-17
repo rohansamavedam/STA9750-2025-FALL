@@ -186,6 +186,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="data-acquisition" class="level2">
 <h2 class="anchored" data-anchor-id="data-acquisition">Data Acquisition</h2>
+<p>In this step, I set up a data folder for the project and wrote a small function to download NYC City Council district boundaries directly from the NYC Department of Planning. The file comes as a ZIP containing map data, so the code downloads it only if it isn’t already saved, unzips it, and then reads the shapefile into R. I also convert the map to a standard coordinate system (WGS84) and lightly simplify the shapes so they load and plot faster. The final result is a clean, ready-to-use map of all 51 NYC council districts that will be used throughout the project.</p>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
@@ -291,6 +292,7 @@ $ geometry   &lt;MULTIPOLYGON [°]&gt; MULTIPOLYGON (((-73.86327 4..., MULTIPOLY
 </section>
 <section id="nyc-tree-points" class="level2">
 <h2 class="anchored" data-anchor-id="nyc-tree-points">NYC Tree Points</h2>
+<p>In this step, I download the NYC Tree Census directly from the NYC OpenData API. Because the dataset is large, the code retrieves it in chunks, saves each piece locally, and then combines everything into one clean table. This gives us a full set of NYC street trees—complete with locations and attributes—for mapping and analysis.</p>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
@@ -417,6 +419,7 @@ Attaching package: 'jsonlite'</code></pre>
 </section>
 <section id="data-integration-and-initial-exploration" class="level2">
 <h2 class="anchored" data-anchor-id="data-integration-and-initial-exploration">Data Integration and Initial Exploration</h2>
+<p>In this part of the project, I map all NYC street trees on top of the city’s council district boundaries to get a first visual sense of how trees are spread across the five boroughs. Then, using a spatial join, I assign each individual tree to the district it falls in. This combined dataset becomes the foundation for all district-level comparisons and analysis that follow.</p>
 <section id="mapping-nyc-trees" class="level3">
 <h3 class="anchored" data-anchor-id="mapping-nyc-trees">Mapping NYC Trees</h3>
 <div class="cell">
@@ -485,7 +488,7 @@ Attaching package: 'jsonlite'</code></pre>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>  CounDist tree_count
-1       NA     190000</code></pre>
+1       NA     250000</code></pre>
 </div>
 </div>
 </section>
@@ -621,6 +624,7 @@ Attaching package: 'jsonlite'</code></pre>
 </section>
 <section id="government-project-design" class="level3">
 <h3 class="anchored" data-anchor-id="government-project-design">Government Project Design</h3>
+<p>In this section, I focus on District 2 and use the joined tree-and-boundary data to summarize tree records, highlight missing species information, and visualize how trees are distributed within the district. I then compare District 2 to other districts using both bar charts and side-by-side maps to show differences in data completeness and spatial patterns. These visuals help motivate the proposed tree project and provide a data-backed foundation for the policy recommendation.</p>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
