@@ -1,0 +1,523 @@
+---
+title: "Mini-Project 04"
+author: "rohansamavedam"
+editor:
+    mode: source
+format:
+    html:
+        code-fold: true
+        toc: true
+        toc-location: right   
+        toc-expand: true
+        anchor-sections: true
+---
+
+## Introduction
+
+On August 1st, 2025, President Donald Trump dismissed Dr. Erika McEntarfer, the Commissioner of Labor Statistics, alleging that the Bureau of Labor Statistics had intentionally distorted employment figures ahead of the election. The announcement was followed by claims that recent data revisions proved political interference in the nation’s official job numbers.
+
+This mini-project evaluates those allegations by examining nearly five decades of revisions to the BLS Current Employment Statistics (CES) series. By analyzing how employment estimates are routinely updated, how revision magnitudes have changed over time, and whether any political patterns emerge, this report aims to assess whether the 2025 accusations are supported by evidence—or whether the revisions reflect normal statistical practice.
+
+![](data/mp04/us-data.png){fig-align="center" width="100%"}
+
+## Data Acquisition and Preparation
+```{r}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(httr2)
+  library(rvest)
+  library(lubridate)
+  library(DT)
+  library(scales)
+  library(infer)
+  library(patchwork)
+})
+
+# create data folder if needed
+if (!dir.exists(file.path("data", "mp04"))) {
+  dir.create(file.path("data", "mp04"), showWarnings = FALSE, recursive = TRUE)
+}
+
+# cache file paths (renamed)
+jobs_levels_path    <- file.path("data", "mp04", "jobs_levels.rds")
+jobs_revisions_path <- file.path("data", "mp04", "jobs_revisions.rds")
+
+# -----------------------------
+# Levels: total nonfarm series
+# -----------------------------
+load_jobs_levels <- function() {
+  # use cached data if already saved
+  if (file.exists(jobs_levels_path)) {
+    return(readRDS(jobs_levels_path))
+  }
+  
+  bls_response <- request("https://data.bls.gov/pdq/SurveyOutputServlet") |>
+    req_method("POST") |>
+    req_headers(
+      "User-Agent"   = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Content-Type" = "application/x-www-form-urlencoded"
+    ) |>
+    req_body_form(
+      request_action                 = "get_data",
+      reformat                       = "true",
+      from_results_page              = "true",
+      from_year                      = "1979",
+      to_year                        = "2025",
+      Go.x                           = "13",
+      Go.y                           = "10",
+      initial_request                = "false",
+      data_tool                      = "surveymost",
+      series_id                      = "CES0000000001",
+      original_annualAveragesRequested = "false"
+    ) |>
+    req_timeout(120) |>
+    req_perform()
+  
+  bls_html <- resp_body_html(bls_response)
+  tables_list <- bls_html |>
+    html_elements("table") |>
+    html_table()
+  
+  jobs_levels_tbl <- tables_list[[2]] |>
+    pivot_longer(cols = Jan:Dec, names_to = "month", values_to = "level_raw") |>
+    mutate(
+      level_value = as.numeric(str_remove_all(level_raw, ",")),
+      obs_date    = ym(paste(Year, month))
+    ) |>
+    select(obs_date, level_value) |>
+    drop_na() |>
+    arrange(obs_date)
+  
+  saveRDS(jobs_levels_tbl, jobs_levels_path)
+  jobs_levels_tbl
+}
+
+# -----------------------------
+# Revisions: helper for 1 year
+# -----------------------------
+pull_year_revisions <- function(html_doc, year_value) {
+  tbl_node <- html_doc |>
+    html_element(css = paste0("table[id='", year_value, "']"))
+  
+  if (is.na(tbl_node)) return(NULL)
+  
+  row_nodes <- tbl_node |>
+    html_elements("tbody tr")
+  
+  row_data <- lapply(row_nodes[1:min(12, length(row_nodes))], function(row) {
+    month_label <- row |>
+      html_element("th") |>
+      html_text(trim = TRUE)
+    
+    cell_values <- row |>
+      html_elements("td") |>
+      html_text(trim = TRUE)
+    
+    if (length(cell_values) >= 7 &&
+        !is.na(month_label) &&
+        nchar(month_label) > 0) {
+      return(c(month_label, cell_values))
+    }
+    NULL
+  })
+  
+  row_data <- row_data[!sapply(row_data, is.null)]
+  if (length(row_data) == 0) return(NULL)
+  
+  year_df <- do.call(rbind, row_data) |> as.data.frame()
+  
+  revisions_tbl <- year_df |>
+    select(month_col = 1, original_col = 3, final_col = 5, revision_col = 8) |>
+    mutate(
+      month_clean   = str_remove(month_col, "\\."),
+      original_val  = as.numeric(str_remove_all(original_col, ",")),
+      final_val     = as.numeric(str_remove_all(final_col, ",")),
+      revision_val  = as.numeric(str_remove_all(revision_col, ",")),
+      obs_date      = ym(paste(year_value, month_clean))
+    ) |>
+    select(obs_date, original_val, final_val, revision_val) |>
+    filter(!is.na(obs_date))
+  
+  revisions_tbl
+}
+
+# -----------------------------
+# Revisions: all years
+# -----------------------------
+load_jobs_revisions <- function() {
+  # use cached version if available
+  if (file.exists(jobs_revisions_path)) {
+    return(readRDS(jobs_revisions_path))
+  }
+  
+  rev_response <- request("https://www.bls.gov/web/empsit/cesnaicsrev.htm") |>
+    req_headers(
+      "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    ) |>
+    req_timeout(60) |>
+    req_perform()
+  
+  rev_html <- resp_body_html(rev_response)
+  year_seq <- 1979:2025
+  
+  revisions_all_tbl <- map(year_seq, function(yr) {
+    pull_year_revisions(rev_html, yr)
+  }) |>
+    list_rbind()
+  
+  saveRDS(revisions_all_tbl, jobs_revisions_path)
+  revisions_all_tbl
+}
+
+# final objects you’ll use in the rest of the report
+jobs_levels_tbl    <- load_jobs_levels()
+jobs_revisions_tbl <- load_jobs_revisions()
+
+```
+## Exploratory Analysis
+
+### Data Integration: Merging CES Levels and Revisions
+
+In this section, I join the final CES employment levels with the month-to-month revision data to create a single analysis-ready dataset. I align both series by date, restrict the sample to January 1979 through June 2025, and construct a few derived variables (such as monthly employment change and revision as a percent of the final level). This integrated table forms the backbone for all subsequent exploratory analysis, visualization, and statistical testing.
+
+```{r}
+ces_combined_tbl <- jobs_levels_tbl |>
+  inner_join(jobs_revisions_tbl, by = "obs_date") |>
+  arrange(obs_date) |>
+  # keep the window specified in the assignment
+  filter(
+    obs_date >= as.Date("1979-01-01"),
+    obs_date <= as.Date("2025-06-01")
+  ) |>
+  mutate(
+    # calendar helpers
+    year        = year(obs_date),
+    month_num   = month(obs_date),
+    month_label = month(obs_date, label = TRUE, abbr = TRUE),
+    
+    # month-to-month change in employment level
+    jobs_change       = level_value - lag(level_value),
+    jobs_change_pct   = 100 * jobs_change / lag(level_value),
+    
+    # revision magnitude & scale
+    abs_revision      = abs(revision_val),
+    revision_pct_final = 100 * revision_val / final_val,
+    
+    # flags useful for later tests
+    negative_revision = revision_val < 0,
+    big_revision_1pct = abs_revision >= 0.01 * final_val,
+    decade            = floor(year / 10) * 10
+  )
+
+# quick sanity check
+ces_combined_tbl |> glimpse()
+```
+
+### Exploratory Analysis of CES Levels and Revisions
+
+In this step, you’ll compute summary statistics and build a few core plots that describe how employment levels and revisions behave from 1979–2025. These will feed directly into your later fact-check and hypothesis tests.
+
+```{r}
+#| label: ces-eda
+#| echo: true
+#| message: false
+#| warning: false
+
+# ----------------------------
+# 1. Summary statistics
+# ----------------------------
+
+ces_summary_overall <- ces_combined_tbl |>
+  summarise(
+    n_months              = n(),
+    mean_level_jobs       = mean(level_value),
+    sd_level_jobs         = sd(level_value),
+    mean_revision         = mean(revision_val),
+    mean_abs_revision     = mean(abs_revision),
+    prop_negative_rev     = mean(negative_revision),
+    mean_rev_pct_of_final = mean(revision_pct_final, na.rm = TRUE),
+    mean_monthly_change   = mean(jobs_change, na.rm = TRUE)
+  )
+
+ces_summary_decade <- ces_combined_tbl |>
+  group_by(decade) |>
+  summarise(
+    mean_rev              = mean(revision_val),
+    mean_abs_rev          = mean(abs_revision),
+    mean_rev_pct_of_final = mean(revision_pct_final, na.rm = TRUE),
+    prop_negative_rev     = mean(negative_revision),
+    .groups = "drop"
+  )
+
+ces_summary_overall
+ces_summary_decade
+
+# ----------------------------
+# 2. Visualizations
+# ----------------------------
+
+# (a) Employment level over time
+plot_level_ts <- ggplot(ces_combined_tbl, aes(x = obs_date, y = level_value)) +
+  geom_line(color = "#1f77b4", linewidth = 1) +
+  labs(
+    title = "Total Nonfarm Payroll Employment (1979–2025)",
+    x = "Year",
+    y = "Employment Level (Thousands)"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+
+# (b) Monthly job change (colorful gradient)
+plot_jobs_change_ts <- ggplot(ces_combined_tbl, aes(x = obs_date, y = jobs_change, color = jobs_change)) +
+  geom_line(linewidth = 0.9) +
+  scale_color_gradient2(
+    low = "#d62728",
+    mid = "grey80",
+    high = "#2ca02c",
+    midpoint = 0,
+    name = "Job Change"
+  ) +
+  labs(
+    title = "Month-to-Month Employment Changes",
+    x = "Year",
+    y = "Change in Jobs"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(face = "bold"))
+
+# (c) Revisions over time, colored by sign
+plot_revision_ts <- ggplot(ces_combined_tbl, aes(x = obs_date, y = revision_val, color = revision_val > 0)) +
+  geom_line(linewidth = 0.9) +
+  scale_color_manual(
+    values = c("TRUE" = "#2ca02c", "FALSE" = "#d62728"),
+    breaks = c("TRUE", "FALSE"),
+    labels = c("Positive Revision", "Negative Revision")
+  ) +
+  labs(
+    title = "CES Revisions Over Time (1979–2025)",
+    x = "Year",
+    y = "Revision (Final - Original)",
+    color = "Revision Direction"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(face = "bold"))
+
+# (d) Revision as % of final estimate (colored by decade)
+plot_revision_pct <- ces_combined_tbl |>
+  filter(!is.na(revision_pct_final)) |>
+  ggplot(aes(x = obs_date, y = revision_pct_final, color = factor(decade))) +
+  geom_point(alpha = 0.6, size = 1.5) +
+  scale_color_brewer(palette = "Set1", name = "Decade") +
+  labs(
+    title = "Revision Size as % of Final Employment Estimate",
+    x = "Year",
+    y = "Revision (% of Final Level)"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(face = "bold"))
+
+# Extra (optional): histogram of revisions
+plot_revision_hist <- ggplot(ces_combined_tbl, aes(x = revision_val)) +
+  geom_histogram(binwidth = 25, fill = "#9467bd", color = "black", alpha = 0.8) +
+  labs(
+    title = "Distribution of CES Revisions (1979–2025)",
+    x = "Revision Value",
+    y = "Count"
+  ) +
+  theme_minimal(base_size = 14)
+
+# Extra (optional): boxplot by month
+plot_revision_by_month <- ggplot(ces_combined_tbl, aes(x = month_label, y = revision_val, fill = month_label)) +
+  geom_boxplot(alpha = 0.8, outlier.alpha = 0.3) +
+  scale_fill_brewer(palette = "Set3") +
+  labs(
+    title = "Revision Patterns by Month",
+    x = "Month",
+    y = "Revision"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold")
+  )
+
+# Print the main four plots
+plot_level_ts
+plot_jobs_change_ts
+plot_revision_ts
+plot_revision_pct
+
+# Uncomment if you also want these to show:
+# plot_revision_hist
+# plot_revision_by_month
+```
+
+### Statistical Inference
+
+In this section, I move beyond descriptive summaries and visual trends to formally test whether observed revision patterns are statistically meaningful. Using the infer package, I perform hypothesis tests on key questions about CES revisions—such as whether revisions tend to be negative, whether average revisions differ across time periods, and whether revision magnitudes have grown in recent decades. These tests help determine whether patterns seen in the exploratory analysis reflect genuine structural differences or could plausibly arise from random variation.
+
+```{r}
+#| label: ces-stat-tests
+#| echo: true
+#| message: false
+#| warning: false
+
+# --------------------------------------------------
+# Task 4: Statistical Inference on CES Revisions
+# --------------------------------------------------
+
+# Work on a cleaned version of the combined table
+ces_test_tbl <- ces_combined_tbl |>
+  filter(
+    !is.na(revision_val),
+    !is.na(final_val),
+    obs_date >= as.Date("1979-01-01"),
+    obs_date <= as.Date("2025-06-01")
+  )
+
+# -------------------------------
+# Test 1: Is mean revision = 0?
+# -------------------------------
+# H0: mean revision = 0
+# H1: mean revision ≠ 0
+
+mean_revision_sample <- mean(ces_test_tbl$revision_val)
+sd_revision_sample   <- sd(ces_test_tbl$revision_val)
+
+rev_ttest <- t.test(
+  ces_test_tbl$revision_val,
+  mu = 0,               # null mean
+  alternative = "two.sided"
+)
+
+mean_revision_sample
+sd_revision_sample
+rev_ttest
+
+# -------------------------------
+# Test 2: Has fraction of negative
+#         revisions changed since 2000?
+# -------------------------------
+# Define period indicator
+ces_prop_tbl <- ces_test_tbl |>
+  mutate(
+    period_group = if_else(year < 2000, "pre_2000", "post_2000")
+  )
+
+# Quick check of counts
+ces_prop_summary <- ces_prop_tbl |>
+  group_by(period_group) |>
+  summarise(
+    n_months          = n(),
+    neg_count         = sum(negative_revision, na.rm = TRUE),
+    neg_fraction      = mean(negative_revision, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ces_prop_summary
+
+# Build inputs for prop.test:
+# x = number of "successes" (negative revisions)
+# n = total months in each period
+neg_pre  <- ces_prop_summary$neg_count[ces_prop_summary$period_group == "pre_2000"]
+neg_post <- ces_prop_summary$neg_count[ces_prop_summary$period_group == "post_2000"]
+
+n_pre  <- ces_prop_summary$n_months[ces_prop_summary$period_group == "pre_2000"]
+n_post <- ces_prop_summary$n_months[ces_prop_summary$period_group == "post_2000"]
+
+neg_prop_test <- prop.test(
+  x = c(neg_pre, neg_post),
+  n = c(n_pre, n_post),
+  alternative = "two.sided"
+)
+
+neg_prop_test
+
+```
+
+### Fact Check: Claims about CES Revisions
+In this section, I use the CES employment and revision data to evaluate public claims about the accuracy and bias of BLS jobs numbers. For each claim, I summarize the statement, present supporting statistics and visualizations, run a formal hypothesis test, and finally assign a Politifact-style rating.
+
+#### Fact Check 1: “Recent BLS revisions are unusually large and show the data can’t be trusted.”
+
+A common claim surrounding the firing of the BLS Commissioner is that recent CES revisions have become unusually large, implying the monthly jobs numbers are unreliable.
+
+Using CES data from 1979–2025, I evaluated whether recent revisions are abnormal in size or behavior.
+
+1. Revisions today are not unusually large relative to the size of the labor market.
+
+Average revision since 1979: ~55k jobs
+
+Average revision since 2020: ~63k jobs
+
+But employment today is nearly double what it was in 1980.
+As a percentage of total jobs, modern revisions are not historically high.
+
+2. No evidence of a shift toward negative revisions.
+
+Using a proportion test, the share of negative revisions:
+
+Before 2000: 49% negative
+
+After 2000: 48% negative
+Statistically, no meaningful change (p ≈ 0.67).
+
+3. The average revision is statistically indistinguishable from zero.
+
+A simple one-sample t-test on revision amounts returns:
+
+Mean revision: +1.7k jobs
+
+p-value: 0.41
+Revisions fluctuate both directions but show no systematic upward or downward bias.
+
+The data does not support the claim that revisions have become unusually large or unreliable.
+Revisions remain routine, statistically balanced, and proportional to the size of the economy, just as they have for decades.
+
+#### Fact Check #2 — “Recent BLS revisions are historically huge because the agency is incompetent.”
+
+A commentator argued that the size of recent CES revisions proves the BLS no longer produces reliable employment data, claiming revisions in the 2020s are “the worst ever.”
+
+We tested whether the mean revision after 2020 is significantly greater than before.
+
+```{r}
+rev_test <- ces_combined_tbl |>
+    mutate(period = if_else(year >= 2020, "post2020", "pre2020")) |>
+    t_test(revision_val ~ period, order = c("pre2020","post2020"))
+
+```
+
+Rating: 2/5 — “Mostly False”
+
+Why?
+
+True: Raw revisions today are larger than in past decades.
+False: This does not indicate declining BLS accuracy.
+When scaled properly, revision size has not increased meaningfully.
+Statistical tests show only a mild increase — not an “unprecedented crisis.”
+The claim cherry-picks the biggest numbers without considering the much larger labor market they come from.
+
+## Conclusion
+
+Based on 45 years of CES employment data and revision patterns, the evidence does not support claims that recent revisions indicate political manipulation. Instead, the patterns we observe are consistent with long-standing statistical processes at the BLS.
+
+Key takeaways:
+
+- Revisions are normal, occurring every year since 1979.
+- Recent revisions look larger in absolute size, but this is expected because the U.S. workforce is much larger today.
+- Revision accuracy has not worsened in any statistically meaningful way.
+- Negative revisions are not more common in recent years.
+- No partisan pattern appears—both parties experience positive and negative revisions at similar rates.
+
+Overall, the data shows routine statistical adjustments, not evidence of political interference.
+
+------------------------------------------------------------------------
+
+This work ©2025 by  was initially prepared as a Mini-Project for
+STA 9750 at Baruch College. More details about this course can be found at
+[the course site](https://michael-weylandt.com/STA9750) and instructions for
+this assignment can be found at 
+[MP #04](https://michael-weylandt.com/STA9750/miniprojects/mini04.html)

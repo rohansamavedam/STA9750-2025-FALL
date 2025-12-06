@@ -8,6 +8,7 @@ subtitle: "Submission Material for STA 9750 (Software Tools for Data Analysis)"
 - [Mini Project 01: Netflix Gourmet Cheeseburgers (Press Releases)](https://rohansamavedam.github.io/STA9750-2025-FALL/mp01.html)
 - [Mini Project 02: Making Backyards Affordable for All](https://rohansamavedam.github.io/STA9750-2025-FALL/mp02.html)
 - [Mini Project 03: Visualizing and Maintaining the Green Canopy of NYC](https://rohansamavedam.github.io/STA9750-2025-FALL/mp03.html)
+- [Mini Project 04: Just the Fact(-Check)s, Ma’am!](https://rohansamavedam.github.io/STA9750-2025-FALL/mp04.html)
 
 
 ```{r}

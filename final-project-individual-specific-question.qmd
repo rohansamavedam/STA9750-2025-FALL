@@ -1,0 +1,27 @@
+---
+title: "Final Individual Proejct"
+author: "rohansamavedam"
+editor:
+    mode: source
+format:
+    html:
+        code-fold: true
+        toc: true
+        toc-location: right   
+        toc-expand: true
+        anchor-sections: true
+---
+
+## Introduction & Specific Question
+
+## Data Sources
+
+## Data Preparation & Merging Strategy
+
+## R Code: Cleaning, Merging, and Analysis
+
+## Visualizations
+
+## Limitations and Trade Offs
+
+## Conclusion
