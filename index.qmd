@@ -3,6 +3,9 @@ title: "Krishna Rohan Samavedam - Graduate Student @ CUNY Baruch College"
 subtitle: "Submission Material for STA 9750 (Software Tools for Data Analysis)"
 ---
 
+### Final Project
+- **[Individual Report: Platform Differences in Mental Health & Social Media Addiction](https://rohansamavedam.github.io/STA9750-2025-FALL/final-project-individual-specific-question.html)**
+
 ### Mini Projects
 
 - [Mini Project 01: Netflix Gourmet Cheeseburgers (Press Releases)](https://rohansamavedam.github.io/STA9750-2025-FALL/mp01.html)
