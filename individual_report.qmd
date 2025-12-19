@@ -1,0 +1,268 @@
+---
+title: "Final Individual Report"
+author: "rohansamavedam"
+editor:
+    mode: source
+format:
+    html:
+        code-fold: true
+        toc: true
+        toc-location: right   
+        toc-expand: true
+        anchor-sections: true
+---
+
+## Introduction & Specific Question
+
+Social media platforms play an increasingly central role in the daily lives of young adults, shaping not only how individuals communicate but also how they consume information, form social identities, and regulate attention and emotion. Platforms such as Facebook, Instagram, and TikTok differ substantially in design philosophy, content delivery mechanisms, and engagement incentives. For example, TikTok’s algorithm emphasizes short-form, highly personalized video content designed to maximize continuous engagement, while Facebook prioritizes social connections and Instagram focuses on visual self-presentation. These structural differences may meaningfully influence users’ psychological well-being and behavioral dependence on social media.
+
+Emerging research suggests that heavy social media use is associated with higher levels of anxiety, depressive symptoms, sleep disruption, and attention difficulties, particularly among adolescents and young adults. However, much of the existing literature treats social media use as a single, aggregated behavior rather than examining how specific platforms may differ in their associations with mental health outcomes. This analysis addresses that gap by focusing on platform-specific differences among young adults aged 16–25.
+
+By comparing mental health and addiction scores across Facebook, Instagram, and TikTok users, this study aims to clarify whether certain platforms are more strongly associated with negative well-being outcomes than others, while emphasizing that the results reflect correlations rather than causal relationships.
+
+### Specific Question
+
+How are mental health and social media addiction scores different across Facebook, Instagram, and TikTok users?
+
+![](data/individual-specific-question/display-image.png){fig-align="center" width="100%"}
+
+## Data Sources
+
+For this analysis, I use the publicly available dataset Student Social Media & Relationships, originally published on Kaggle. Accessible at: https://www.kaggle.com/datasets/adilshamim8/social-media-addiction-vs-relationships
+
+### Dataset Description
+
+The Social Media Addiction vs Relationships dataset provides a rich snapshot of social media behavior and well-being among students across diverse geographic and cultural contexts. Because the dataset includes respondents from multiple countries and academic levels, it captures a wide range of social media usage patterns and lifestyle factors. In addition to platform preference, the dataset includes measures such as average daily usage hours, sleep duration, and reported academic or relationship impacts, which are commonly linked to mental health outcomes in prior research.
+
+The inclusion of both a Mental_Health_Score and an Addicted_Score allows for a nuanced distinction between general emotional well-being and behavioral dependence. This distinction is important because a user may report moderate mental health while still exhibiting high addictive tendencies toward a platform. Overall, the dataset’s structure makes it well-suited for comparative platform analysis, despite inherent limitations such as self-reporting and the lack of longitudinal tracking.
+
+## Data Preparation
+
+```{r}
+# importing required libraries
+suppressPackageStartupMessages({
+    library(tidyverse)
+    library(janitor)
+    library(broom)
+    library(car)
+    library(effectsize)
+    library(DT)
+})
+```
+
+### Loading Data & Cleaning
+
+```{r}
+# loading the dataset
+raw <- read_csv("data/individual-specific-question/student-social-media-addiction.csv") |>
+  clean_names()
+```
+
+Glimpse of the raw data
+
+```{r}
+nrow(raw)
+```
+
+Datatable view of the raw data
+
+```{r}
+datatable(raw)
+```
+
+Filtering to age range and standardizing platform names
+
+```{r}
+data_clean <- raw |>
+  filter(age >= 16, age <= 25) |>
+  mutate(
+    platform_clean = case_when(
+      str_to_lower(most_used_platform) %in% c("tiktok", "tik tok", "tiktok ") ~ "TikTok",
+      str_to_lower(most_used_platform) %in% c("instagram", "insta") ~ "Instagram",
+      str_to_lower(most_used_platform) %in% c("facebook", "fb") ~ "Facebook",
+      TRUE ~ NA_character_
+    )
+  ) |>
+  # keep only TikTok / Instagram / Facebook
+  filter(!is.na(platform_clean)) |>
+  # drop missing outcome values
+  drop_na(mental_health_score, addicted_score) |>
+  # platform as ordered factor
+  mutate(
+    platform_clean = factor(platform_clean,
+                            levels = c("Facebook", "Instagram", "TikTok"))
+  )
+```
+
+Checking counts per platform
+
+```{r}
+data_clean |>
+  count(platform_clean)
+
+nrow(data_clean)
+```
+
+After loading the raw survey data, I filtered the sample to students aged 16–25 and standardized the “Most_Used_Platform” variable to focus on Facebook, Instagram, and TikTok. I removed rows with missing values for mental_health_score or addicted_score and converted the cleaned platform variable into an ordered factor.
+
+The final cleaned dataset includes 526 students:
+
+- 123 Facebook users
+- 249 Instagram users
+- 154 TikTok users
+
+These group sizes are sufficient for comparing mental health and addiction outcomes across platforms.
+
+## Analysis
+
+Descriptive statistics
+
+```{r}
+### Descriptive statistics by platform
+desc_tbl <- data_clean |>
+  group_by(platform_clean) |>
+  summarise(
+    n              = n(),
+    mean_mh        = mean(mental_health_score, na.rm = TRUE),
+    sd_mh          = sd(mental_health_score, na.rm = TRUE),
+    mean_addiction = mean(addicted_score, na.rm = TRUE),
+    sd_addiction   = sd(addicted_score, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+desc_tbl
+```
+
+ANOVA: mental health score by platform (ANOVA stands for Analysis of Variance.)
+It’s a statistical test used to compare the average (mean) of a numeric variable across three or more groups.
+
+```{r}
+### ANOVA: Mental health score ~ platform
+
+fit_mh <- aov(mental_health_score ~ platform_clean, data = data_clean)
+summary(fit_mh)
+
+# Effect size
+eta_squared(fit_mh)
+
+# Post-hoc comparisons
+mh_tukey <- TukeyHSD(fit_mh)
+mh_tukey
+```
+
+ANOVA: addiction score by platform
+
+```{r}
+### ANOVA: Addiction score ~ platform
+
+fit_add <- aov(addicted_score ~ platform_clean, data = data_clean)
+summary(fit_add)
+
+eta_squared(fit_add)
+TukeyHSD(fit_add)
+```
+
+### Interpretation of Results
+
+The results reveal a clear and consistent pattern across both outcome measures. Facebook users report the most favorable well-being outcomes, with the highest average mental health scores and the lowest addiction levels. Instagram users occupy an intermediate position, while TikTok users consistently report worse mental health and higher addiction scores. Importantly, these differences are not only statistically significant but also practically meaningful, as indicated by moderate effect sizes (η² = 0.11 for mental health and η² = 0.18 for addiction).
+
+The Tukey post-hoc comparisons confirm that every pairwise difference is statistically significant, suggesting that these patterns are not driven by a single outlying platform. One plausible interpretation is that TikTok’s highly immersive, algorithm-driven content structure may encourage prolonged use and reduced self-regulation, which could contribute to both higher addiction scores and lower perceived well-being. Conversely, Facebook’s more socially oriented and less rapidly paced content may be associated with lower psychological strain in this age group.
+
+#### Mental health score by platform
+On a 1–10 mental health scale, Facebook users reported the highest average scores (mean = 6.72), followed by Instagram users (6.12), and TikTok users (5.71).
+
+A one-way ANOVA shows that these differences are statistically significant (F(2, 523) = 31.65, p ≈ 1.1 × 10⁻¹³), with platform explaining about 11% of the variance in mental health scores (η² = 0.11). Tukey post-hoc tests indicate that all three pairs differ: Instagram users report lower mental health than Facebook users, and TikTok users report lower mental health than both Facebook and Instagram users.
+
+#### Addiction score by platform
+On the 1–10 addiction scale, TikTok users report the highest addiction scores (mean = 7.43), followed by Instagram (6.55), and Facebook users have the lowest scores (5.67).
+
+The ANOVA for addiction is also highly significant (F(2, 523) = 55.66, p < 2 × 10⁻¹⁶), with platform explaining about 18% of the variance in addiction scores (η² = 0.18). Tukey comparisons again show significant differences between every pair: Instagram users are more “addicted” than Facebook users, and TikTok users are more “addicted” than both Facebook and Instagram users.
+
+#### Bottom Line
+In this student sample, TikTok is consistently associated with worse self-reported mental health and higher social media addiction, Facebook looks comparatively better on both measures, and Instagram lies in between.
+
+## Visualizations
+
+This boxplot compares mental health scores (rated 1–10) across the three most-used platforms: Facebook, Instagram, and TikTok. Each box represents the distribution of scores for students who primarily use that platform.
+
+```{r}
+ggplot(data_clean, aes(x = platform_clean, y = mental_health_score, fill = platform_clean)) +
+  geom_boxplot(alpha = 0.8, color = "black") +
+  scale_fill_manual(values = c(
+    "Facebook" = "#3b5998",   # blue
+    "Instagram" = "#e4405f", # pink/red
+    "TikTok" = "#010101"     # black/teal accent
+  )) +
+  labs(
+    x = "Most-used platform",
+    y = "Mental health score (1–10)",
+    fill = "Platform"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "none",
+    panel.grid.minor = element_blank()
+  )
+```
+
+This visualization displays the average social media addiction score (rated 1–10) for Facebook, Instagram, and TikTok users, along with 95% confidence intervals for each mean. Each point represents the platform’s average score, and the vertical bars show the uncertainty around that estimate.
+
+```{r}
+add_summary <- data_clean |>
+  group_by(platform_clean) |>
+  summarise(
+    mean_add = mean(addicted_score),
+    se_add   = sd(addicted_score) / sqrt(n()),
+    .groups  = "drop"
+  )
+
+ggplot(add_summary, aes(x = platform_clean, y = mean_add, color = platform_clean)) +
+  geom_point(size = 4) +
+  geom_errorbar(
+    aes(
+      ymin = mean_add - 1.96 * se_add,
+      ymax = mean_add + 1.96 * se_add
+    ),
+    width = 0.1,
+    linewidth = 1
+  ) +
+  scale_color_manual(values = c(
+    "Facebook"  = "#3b5998",
+    "Instagram" = "#e4405f",
+    "TikTok"    = "#010101"
+  )) +
+  labs(
+    x = "Most-used platform",
+    y = "Mean addiction score (1–10)"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    panel.grid.minor = element_blank()
+  )
+```
+
+## Limitations and Trade Offs
+
+- Self-reported data: All mental health and addiction scores rely on subjective self-ratings, which may introduce bias or inaccuracies.
+- Cross-sectional design: The dataset captures a single moment in time, so the analysis shows associations, not causal effects.
+- Platform simplification: Only Facebook, Instagram, and TikTok were analyzed; other platforms were excluded, which may limit generalizability.
+- Unmeasured confounders: Factors like personality traits, offline stress, or academic workload were not included but may influence both platform choice and mental health.
+- Sampling bias: Participants were recruited online, likely over-representing high social-media users.
+
+Despite these limitations, the dataset is large enough and structured well enough to provide meaningful comparative insights across platforms.
+
+## Conclusion
+
+This analysis demonstrates that social media platform choice is meaningfully associated with both mental health and social media addiction among young adults. Across all comparisons, TikTok users reported the least favorable outcomes, Facebook users reported the most favorable outcomes, and Instagram users fell between the two. These findings reinforce concerns that not all social media platforms exert equal psychological influence and that platform design features may play a role in shaping user well-being.
+
+While the cross-sectional nature of the data prevents causal conclusions, the consistency and magnitude of the observed differences suggest that platform-specific effects warrant closer attention from researchers, educators, and policymakers. Future research using longitudinal or experimental designs could help disentangle whether platform use drives changes in mental health or whether individuals with certain psychological profiles gravitate toward specific platforms.
+
+### Key Findings
+
+- Facebook users reported the highest mental health scores and the lowest addiction levels.
+- Instagram users showed moderate mental health and moderate addiction scores.
+- TikTok users consistently reported the lowest mental health and the highest addiction levels.
+- ANOVA and post-hoc tests confirmed that all platform differences were statistically significant.
+
+Overall, these results suggest that the platform a student uses most is strongly associated with their mental well-being and social media dependence. While the data cannot establish causality, the patterns align with growing evidence that certain platforms—particularly TikTok—may correlate with higher psychological strain among young adults.

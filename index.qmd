@@ -4,7 +4,8 @@ subtitle: "Submission Material for STA 9750 (Software Tools for Data Analysis)"
 ---
 
 ### Final Project
-- **[Individual Report: Platform Differences in Mental Health & Social Media Addiction](https://rohansamavedam.github.io/STA9750-2025-FALL/final-project-individual-specific-question.html)**
+- **[Summary Report: How is social media usage associated with indicators of anxiety, depression, and attention difficulties among young adults worldwide?](https://rohansamavedam.github.io/STA9750-2025-FALL/summary_report.html)**
+- **[Individual Report: Platform Differences in Mental Health & Social Media Addiction](https://rohansamavedam.github.io/STA9750-2025-FALL/individual_report.html)**
 
 ### Mini Projects
 
